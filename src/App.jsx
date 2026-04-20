@@ -30,14 +30,22 @@ const App = () => {
       return;
     }
 
-    setPhotos((prev) => ({ ...prev, [returnKey]: photoUrl }));
+    const photoLocation = loc?.latitude && loc?.longitude ? {
+      lat: loc.latitude,
+      lng: loc.longitude,
+      accuracy: loc.accuracy,
+    } : null;
 
-    if (loc?.latitude && loc?.longitude) {
-      setLocation({
-        lat: loc.latitude,
-        lng: loc.longitude,
-        accuracy: loc.accuracy,
-      });
+    setPhotos((prev) => ({ 
+      ...prev, 
+      [returnKey]: { 
+        url: photoUrl, 
+        location: photoLocation 
+      } 
+    }));
+
+    if (photoLocation) {
+      setLocation(photoLocation);
     }
 
     setSuccess(`Successfully captured: ${returnKey.replace("_", " ")}`);
@@ -209,21 +217,21 @@ const App = () => {
           <h3 style={styles.sectionLabel}>Capture Operations</h3>
           <div style={styles.cameraGrid}>
             <ActionCard 
-              title="Worker Profile" 
+              title="Capture Worker 1 Photo" 
               description="Primary personnel verification"
               icon={User} 
               color="#2563eb"
               onClick={() => capturePhoto("worker_1")}
             />
             <ActionCard 
-              title="Secondary Identity" 
+              title="Capture Worker 2 Photo" 
               description="Witness or partner capture"
               icon={User} 
               color="#4f46e5"
               onClick={() => capturePhoto("worker_2")}
             />
             <ActionCard 
-              title="Site Inspection" 
+              title="Capture Premises Photo" 
               description="Premises and surrounding area"
               icon={Building2} 
               color="#7c3aed"
@@ -262,11 +270,21 @@ const App = () => {
               </div>
             )}
 
-            {Object.entries(photos).map(([key, url]) => (
-              <div key={key} style={styles.previewCard}>
-                <div style={styles.previewImageContainer}>
-                  <img src={url} style={styles.image} alt={key} />
+            {Object.entries(photos).map(([key, data]) => (
+              <div key={key} style={{ ...styles.previewCard, gridColumn: 'span 2' }}>
+                <div style={styles.previewImageContainerFull}>
+                  <img src={data.url} style={styles.imageFull} alt={key} />
                   <div style={styles.previewBadge}>{key.replace("_", " ")}</div>
+                </div>
+                <div style={styles.imageDetails}>
+                  <div style={styles.detailRow}>
+                    <Locate size={14} color="#64748b" />
+                    <span>{data.location ? `${data.location.lat.toFixed(6)}, ${data.location.lng.toFixed(6)}` : 'No location data'}</span>
+                  </div>
+                  <div style={styles.urlBox}>
+                    <p style={styles.urlLabel}>Image URL:</p>
+                    <a href={data.url} target="_blank" rel="noreferrer" style={styles.urlLink}>{data.url}</a>
+                  </div>
                 </div>
               </div>
             ))}
@@ -457,6 +475,48 @@ const styles = {
     background: "#000",
     display: "flex",
     alignItems: "center",
+  },
+  previewImageContainerFull: {
+    position: "relative",
+    width: "100%",
+    height: "200px",
+  },
+  imageFull: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  },
+  imageDetails: {
+    padding: "12px",
+    background: "#fff",
+  },
+  detailRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    fontSize: "12px",
+    color: "#475569",
+    marginBottom: "8px",
+  },
+  urlBox: {
+    background: "#f8fafc",
+    padding: "8px",
+    borderRadius: "6px",
+    border: "1px solid #e2e8f0",
+  },
+  urlLabel: {
+    fontSize: "10px",
+    color: "#64748b",
+    fontWeight: "600",
+    margin: "0 0 2px 0",
+    textTransform: "uppercase",
+  },
+  urlLink: {
+    fontSize: "10px",
+    color: "#2563eb",
+    textDecoration: "none",
+    wordBreak: "break-all",
+    display: "block",
   },
   image: {
     width: "100%",
