@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { 
-  Camera, 
   Video, 
   MapPin, 
   ShieldCheck, 
@@ -9,183 +8,31 @@ import {
   XCircle, 
   CheckCircle2, 
   Locate,
-  RefreshCw,
   KeyRound,
   FileImage
 } from "lucide-react";
 
+// Modularized Imports
+import { styles } from "./styles/AppStyles";
+import ActionCard from "./components/ActionCard";
+import StatusToast from "./components/StatusToast";
+import { useAndroidBridge } from "./hooks/useAndroidBridge";
+
 const App = () => {
-  const [photos, setPhotos] = useState({});
-  const [videoUrl, setVideoUrl] = useState("");
-  const [location, setLocation] = useState(null);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [token, setToken] = useState("");
-  const [cameraAvailable, setCameraAvailable] = useState(true);
-
-  // ================= ANDROID CALLBACKS =================
-  const recievePhotoFromAndroid = (returnKey, photoUrl, loc) => {
-    if (!photoUrl) {
-      setError("Invalid photo received");
-      return;
-    }
-
-    const photoLocation = loc?.latitude && loc?.longitude ? {
-      lat: loc.latitude,
-      lng: loc.longitude,
-      accuracy: loc.accuracy,
-    } : null;
-
-    setPhotos((prev) => ({ 
-      ...prev, 
-      [returnKey]: { 
-        url: photoUrl, 
-        location: photoLocation 
-      } 
-    }));
-
-    if (photoLocation) {
-      setLocation(photoLocation);
-    }
-
-    setSuccess(`Successfully captured: ${returnKey.replace("_", " ")}`);
-    setTimeout(() => setSuccess(""), 3000);
-  };
-
-  const recieveLiveLocationFromAndroid = (loc) => {
-    if (!loc?.latitude || !loc?.longitude) {
-      setError("Invalid location coordinates received");
-      return;
-    }
-
-    setLocation({
-      lat: loc.latitude,
-      lng: loc.longitude,
-      accuracy: loc.accuracy,
-    });
-
-    setSuccess("Location coordinates synchronized");
-    setTimeout(() => setSuccess(""), 3000);
-  };
-
-  useEffect(() => {
-    window.recievePhotoFromAndroid = recievePhotoFromAndroid;
-    window.recieveLiveLocationFromAndroid = recieveLiveLocationFromAndroid;
-
-    if (!window.AndroidApp?.captureLivePhoto) {
-      setCameraAvailable(false);
-    }
-
-    return () => {
-      delete window.recievePhotoFromAndroid;
-      delete window.recieveLiveLocationFromAndroid;
-    };
-  }, []);
-
-  // ================= ACTIONS =================
-  const capturePhoto = (key) => {
-    setError("");
-    setSuccess("");
-
-    if (window.AndroidApp?.captureLivePhoto) {
-      window.AndroidApp.captureLivePhoto(
-        JSON.stringify({
-          returnKey: key,
-          lens: "both",
-          waterMark: {
-            geoLocation: true,
-            accuracy: true,
-            accuracyLimit: 50,
-            staticDatas: [
-              { key: "type", value: key },
-              { key: "timestamp", value: new Date().toLocaleString() },
-            ],
-          },
-        })
-      );
-    } else {
-      setError("Native camera module not found. Please run inside Android WebView.");
-    }
-  };
-
-  const captureVideo = async () => {
-    setError("");
-    try {
-      if (!window.AndroidApp?.captureLiveVideo) {
-        throw new Error("Video module missing");
-      }
-      const result = await window.AndroidApp.captureLiveVideo();
-      setVideoUrl(result);
-      setSuccess("Video recording completed");
-      setTimeout(() => setSuccess(""), 3000);
-    } catch (err) {
-      setError("Capture failed: Device restricted or module missing");
-    }
-  };
-
-  const getGeoLocation = async () => {
-    setError("");
-    try {
-      if (!window.AndroidApp?.getGeoLocation) {
-        throw new Error("GPS module missing");
-      }
-      const result = await window.AndroidApp.getGeoLocation();
-      const parsed = typeof result === "string" ? JSON.parse(result) : result;
-
-      setLocation({
-        lat: parsed.latitude,
-        lng: parsed.longitude,
-        accuracy: parsed.accuracy,
-      });
-
-      setSuccess("Current position acquired");
-      setTimeout(() => setSuccess(""), 3000);
-    } catch (err) {
-      setError("GPS Failed: Check device permissions");
-    }
-  };
-
-  const getJwtToken = async () => {
-    setError("");
-    try {
-      if (window.AndroidApp?.getJwtToken) {
-        const result = await window.AndroidApp.getJwtToken();
-        setToken(result);
-        setSuccess("Authentication token retrieved");
-        setTimeout(() => setSuccess(""), 3000);
-      } else {
-        setError("Auth service unavailable in current environment");
-      }
-    } catch (err) {
-      setError("Authentication failed: Session expired or invalid");
-    }
-  };
-
-  // ================= UI COMPONENTS =================
-  const ActionCard = ({ title, icon: Icon, color, onClick, description }) => (
-    <div 
-      style={{
-        ...styles.actionCard,
-        borderLeft: `4px solid ${color}`
-      }}
-      onClick={onClick}
-    >
-      <div style={{ ...styles.iconContainer, background: `${color}15` }}>
-        <Icon size={20} color={color} />
-      </div>
-      <div style={styles.cardContent}>
-        <h4 style={styles.cardTitle}>{title}</h4>
-        <p style={styles.cardDescription}>{description}</p>
-      </div>
-    </div>
-  );
-
-  const StatusToast = ({ type, message, icon: Icon }) => (
-    <div style={{ ...styles.toast, ...(type === 'error' ? styles.errorToast : styles.successToast) }}>
-      <Icon size={18} />
-      <span>{message}</span>
-    </div>
-  );
+  const {
+    photos,
+    videoUrl,
+    location,
+    error,
+    success,
+    token,
+    cameraAvailable,
+    capturePhoto,
+    captureVideo,
+    getGeoLocation,
+    getJwtToken,
+    verifyFace
+  } = useAndroidBridge();
 
   return (
     <div style={styles.page}>
@@ -236,6 +83,13 @@ const App = () => {
               icon={Building2} 
               color="#7c3aed"
               onClick={() => capturePhoto("premises")}
+            />
+            <ActionCard 
+              title="Verify Face" 
+              description="Biometric identity validation"
+              icon={ShieldCheck} 
+              color="#10b981"
+              onClick={verifyFace}
             />
           </div>
         </div>
@@ -323,305 +177,6 @@ const App = () => {
       </div>
     </div>
   );
-};
-
-// ================= STYLES =================
-const styles = {
-  page: {
-    minHeight: "100vh",
-    width: "100vw",
-    background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
-    display: "flex",
-    flexDirection: "column",
-    padding: "20px 16px",
-    overflowX: "hidden",
-  },
-  container: {
-    width: "100%",
-    maxWidth: "480px",
-    margin: "0 auto",
-  },
-  header: {
-    marginBottom: "24px",
-    textAlign: "left",
-  },
-  headerTitle: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    marginBottom: "4px",
-  },
-  title: {
-    fontSize: "24px",
-    fontWeight: "700",
-    color: "#0f172a",
-    margin: 0,
-    letterSpacing: "-0.5px",
-  },
-  titleBadge: {
-    fontSize: "12px",
-    background: "#e2e8f0",
-    color: "#64748b",
-    padding: "2px 8px",
-    borderRadius: "12px",
-    verticalAlign: "middle",
-    marginLeft: "4px",
-  },
-  subtitle: {
-    fontSize: "14px",
-    color: "#64748b",
-    margin: 0,
-  },
-  section: {
-    marginBottom: "32px",
-  },
-  sectionLabel: {
-    fontSize: "13px",
-    fontWeight: "600",
-    color: "#94a3b8",
-    textTransform: "uppercase",
-    letterSpacing: "1px",
-    marginBottom: "12px",
-    display: "block",
-  },
-  cameraGrid: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-  },
-  actionCard: {
-    background: "#ffffff",
-    borderRadius: "12px",
-    padding: "16px",
-    display: "flex",
-    alignItems: "center",
-    gap: "16px",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.02), 0 10px 20px -5px rgba(0,0,0,0.04)",
-    cursor: "pointer",
-    transition: "all 0.2s ease",
-  },
-  iconContainer: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "10px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cardContent: {
-    flex: 1,
-  },
-  cardTitle: {
-    margin: "0 0 2px 0",
-    fontSize: "16px",
-    fontWeight: "600",
-    color: "#1e293b",
-  },
-  cardDescription: {
-    margin: 0,
-    fontSize: "12px",
-    color: "#64748b",
-  },
-  utilGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "10px",
-  },
-  utilBtn: {
-    border: "none",
-    borderRadius: "12px",
-    padding: "12px 8px",
-    color: "#fff",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "8px",
-    fontSize: "11px",
-    fontWeight: "500",
-    cursor: "pointer",
-  },
-  previewGrid: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "12px",
-  },
-  emptyState: {
-    gridColumn: "span 2",
-    background: "#fff",
-    border: "2px dashed #e2e8f0",
-    borderRadius: "16px",
-    padding: "40px 20px",
-    textAlign: "center",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "12px",
-    color: "#94a3b8",
-    fontSize: "14px",
-  },
-  previewCard: {
-    borderRadius: "12px",
-    overflow: "hidden",
-    background: "#fff",
-    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-  },
-  previewImageContainer: {
-    position: "relative",
-    aspectRatio: "1",
-  },
-  previewVideoContainer: {
-    position: "relative",
-    aspectRatio: "1",
-    background: "#000",
-    display: "flex",
-    alignItems: "center",
-  },
-  previewImageContainerFull: {
-    position: "relative",
-    width: "100%",
-    height: "200px",
-  },
-  imageFull: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-  },
-  imageDetails: {
-    padding: "12px",
-    background: "#fff",
-  },
-  detailRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    fontSize: "12px",
-    color: "#475569",
-    marginBottom: "8px",
-  },
-  urlBox: {
-    background: "#f8fafc",
-    padding: "8px",
-    borderRadius: "6px",
-    border: "1px solid #e2e8f0",
-  },
-  urlLabel: {
-    fontSize: "10px",
-    color: "#64748b",
-    fontWeight: "600",
-    margin: "0 0 2px 0",
-    textTransform: "uppercase",
-  },
-  urlLink: {
-    fontSize: "10px",
-    color: "#2563eb",
-    textDecoration: "none",
-    wordBreak: "break-all",
-    display: "block",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-  },
-  video: {
-    width: "100%",
-  },
-  previewBadge: {
-    position: "absolute",
-    bottom: "8px",
-    left: "8px",
-    background: "rgba(0,0,0,0.6)",
-    color: "#fff",
-    padding: "2px 8px",
-    borderRadius: "4px",
-    fontSize: "10px",
-    textTransform: "capitalize",
-    backdropFilter: "blur(4px)",
-  },
-  dataCard: {
-    padding: "12px",
-    display: "flex",
-    gap: "10px",
-  },
-  dataIcon: {
-    width: "32px",
-    height: "32px",
-    borderRadius: "8px",
-    background: "#f1f5f9",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  dataContent: {
-    minWidth: 0,
-  },
-  dataLabel: {
-    fontSize: "10px",
-    color: "#94a3b8",
-    fontWeight: "600",
-    textTransform: "uppercase",
-  },
-  dataValue: {
-    fontSize: "14px",
-    fontWeight: "700",
-    color: "#1e293b",
-    lineHeight: "1.2",
-  },
-  dataSub: {
-    fontSize: "11px",
-    color: "#64748b",
-  },
-  tokenText: {
-    fontSize: "10px",
-    color: "#475569",
-    wordBreak: "break-all",
-    marginTop: "4px",
-    fontFamily: "monospace",
-    background: "#f8fafc",
-    padding: "8px",
-    borderRadius: "6px",
-    border: "1px solid #e2e8f0",
-  },
-  warningBox: {
-    background: "#fff7ed",
-    border: "1px solid #fed7aa",
-    borderRadius: "12px",
-    padding: "12px 16px",
-    display: "flex",
-    gap: "12px",
-    marginBottom: "24px",
-  },
-  warningIcon: {
-    fontSize: "20px",
-  },
-  warningText: {
-    margin: "2px 0 0 0",
-    fontSize: "12px",
-    color: "#9a3412",
-  },
-  toast: {
-    position: "fixed",
-    top: "20px",
-    left: "50%",
-    transform: "translateX(-50%)",
-    padding: "12px 20px",
-    borderRadius: "100px",
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    color: "#fff",
-    fontSize: "14px",
-    fontWeight: "500",
-    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-    zIndex: 1000,
-  },
-  successToast: {
-    background: "#059669",
-  },
-  errorToast: {
-    background: "#dc2626",
-  },
 };
 
 export default App;
