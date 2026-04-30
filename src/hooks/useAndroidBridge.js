@@ -152,8 +152,8 @@ export const useAndroidBridge = () => {
     setSuccess("");
 
     const faceEmbeddings = {
-          size: 1,
-          data: [
+  size: 1,
+  data: [
     [
       0.7251223921775818,
       1.366916537284851,
